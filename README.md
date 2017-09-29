@@ -1,6 +1,7 @@
 # Students RESTful web service
 
 ## Run
+```
 cd students
 export GOPATH=$GOPATH:`pwd`
 go get github.com/jinzhu/gorm
@@ -8,6 +9,7 @@ go get github.com/jinzhu/gorm/dialects/sqlite
 go get github.com/gorilla/mux
 cd src
 go run main.go
+```
 
 ### Add student
 `curl -v  -XPOST localhost:8000/ -d'{"name": "Fred", "age": 25, "rating": 50}'`
