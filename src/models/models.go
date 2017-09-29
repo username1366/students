@@ -21,7 +21,7 @@ type (
 	}
 
 	Student struct {
-		ID        uint       `gorm:"primary_key" json:"id"`
+		ID        uint       `gorm:"primary_key"`
 		Name      string     `gorm:"type:varchar(100)" json:"name"`
 		Age       int        `json:"age"`
 		Rating    int        `json:"rating"`
@@ -48,6 +48,7 @@ func (a *App) Run() {
 	a.Router.HandleFunc("/{id:[0-9]+}", a.Get).Methods("GET")
 	a.Router.HandleFunc("/", a.GetAll).Methods("GET")
 	a.Router.HandleFunc("/", a.Add).Methods("POST")
+	a.Router.HandleFunc("/_bulk", a.Bulk).Methods("POST")
 	a.Router.HandleFunc("/{id:[0-9]+}", a.Update).Methods("PUT")
 	a.Router.HandleFunc("/{id:[0-9]+}", a.Delete).Methods("DELETE")
 	log.Printf("Started on socket %s", a.Socket)
@@ -79,6 +80,38 @@ func (a App) Add(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (a App) Bulk(w http.ResponseWriter, r *http.Request) {
+	s := []Student{}
+	w.Header().Set("Content-Type", "application/json")
+	body, _ := ioutil.ReadAll(r.Body)
+	err := json.Unmarshal(body, &s)
+	if err != nil {
+		j, _ := json.Marshal(Message{Error: true, Message: err.Error()})
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "%s\n", j)
+		log.Printf("%v %v", r.RequestURI, err.Error())
+	} else {
+		var count, skip int
+		for i, v := range s {
+			if v.Validate() {
+				a.DB.Create(&v)
+				count = i + 1
+			} else {
+				skip++
+			}
+		}
+		var j []byte
+		if skip > 0 {
+			j, _ = json.Marshal(Message{Error: true, Message: fmt.Sprintf("Inserted %v records. Ignored %v", count, skip)})
+			w.WriteHeader(http.StatusPartialContent)
+		} else {
+			j, _ = json.Marshal(Message{Error: false, Message: fmt.Sprintf("Inserted %v records", count)})
+			w.WriteHeader(http.StatusCreated)
+		}
+		fmt.Fprintf(w, "%v\n", string(j))
+	}
+}
+
 func (a *App) Get(w http.ResponseWriter, r *http.Request) {
 	s := &Student{}
 	w.Header().Set("Content-Type", "application/json")
@@ -92,6 +125,22 @@ func (a *App) Get(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		fmt.Fprintf(w, "%s\n", j)
 		log.Printf("%v No content", r.RequestURI)
+	}
+}
+
+func (a *App) GetAll(w http.ResponseWriter, r *http.Request) {
+	s := []Student{}
+	w.Header().Set("Content-Type", "application/json")
+	a.DB.Where("deleted_at IS NULL").Find(&s)
+	if len(s) > 0 {
+		j, _ := json.Marshal(s)
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "%s\n", j)
+	} else {
+		j, _ := json.Marshal(Message{Error: true, Message: "Could not find any record"})
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "%s\n", j)
+		log.Printf("%v Could not find any record", r.RequestURI)
 	}
 }
 
@@ -135,21 +184,5 @@ func (a *App) Delete(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, "%s\n", j)
 		log.Printf("%v Record is already deleted", r.RequestURI)
-	}
-}
-
-func (a *App) GetAll(w http.ResponseWriter, r *http.Request) {
-	s := []Student{}
-	w.Header().Set("Content-Type", "application/json")
-	a.DB.Where("deleted_at IS NULL").Find(&s)
-	if len(s) > 0 {
-		j, _ := json.Marshal(s)
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "%s\n", j)
-	} else {
-		j, _ := json.Marshal(Message{Error: true, Message: "Could not find any record"})
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, "%s\n", j)
-		log.Printf("%v Could not find any record", r.RequestURI)
 	}
 }

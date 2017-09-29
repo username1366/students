@@ -12,7 +12,10 @@ go run main.go
 ```
 
 ### Add student
-`curl -v  -XPOST localhost:8000/ -d'{"name": "Fred", "age": 25, "rating": 50}'`
+`curl -v -XPOST localhost:8000/ -d'{"name": "Fred", "age": 25, "rating": 50}'`
+
+### Add few students
+`curl -v -XPOST localhost:8000/_bulk -d'[{"name":"Alex","age":24,"rating":55},{"name":"Fred","age":42,"rating":89},{"name":"John","age":27,"rating":98},{"name":"Alice","age":23,"rating":67}]'`
 
 ### Get student by id
 `curl -v localhost:8000/1`
